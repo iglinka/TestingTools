@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:soapui-project id="2fffdb6e-7c8a-42f9-80a9-7f759aae6f26" activeEnvironment="Default" name="PrepareXML" resourceRoot="C:\PrepareXML_source\" soapui-version="5.2.0" abortOnError="false" runType="SEQUENTIAL" xmlns:con="http://eviware.com/soapui/config"><con:settings/><con:testSuite id="a40ff3fd-b5ea-4c17-86bd-66c98883840d" name="Suite to create XML from XML-template and CSV" failOnErrors="true" abortOnError="false"><con:settings/><con:runType>SEQUENTIAL</con:runType><con:testCase failOnError="false" failTestCaseOnErrors="true" keepSession="false" maxResults="0" name="PrepareXML" searchProperties="true" id="aa2235ce-2c37-414f-965e-a7c217752420" timeout="0" wsrmEnabled="false" wsrmVersion="1.0" wsrmAckTo="" amfAuthorisation="false" amfEndpoint="" amfLogin="" amfPassword=""><con:settings/><con:testStep type="groovy" name="WriteAndAddNodes_AddWithHolder" id="e5d0c9b8-54ec-4bc4-87d3-23da58050875"><con:settings/><con:config><script><![CDATA[import groovy.util.XmlSlurper
+import groovy.xml.XmlUtil
+import com.eviware.soapui.support.XmlHolder
+//import groovy.util.XmlParser
+
+// DEFINING inputs
+
+// reading Base XML
+def myInputFile = "C:/PrepareXML_source/inputXML7.xml" 
+// reading TACs
+context.sourceFile = new BufferedReader(new FileReader("C:\\PrepareXML_source\\inputCSV27.csv"))
+
+// READING TACs starts
+
+nextLine = context.sourceFile.readLine()
+propData = nextLine.split(";")
+def colsize1 = propData.size()
+def TACs = new String[50][colsize1]
+int i = 0
+int j = 0
+while(nextLine!=null){
+ propData = nextLine.split(";")
+ j=0
+ while (j<colsize1)
+ {
+  if(propData[j] in ["empty","-","leer"]){propData[j]=""}
+  propData[j]=propData[j].replaceAll('!',':')
+  TACs[i][j]=propData[j]
+ // log.info ("i="+i.toString()+" j="+j.toString()+" "+TACs[i][j]);
+  j++
+ }
+//log.info (nextLine)
+nextLine = context.sourceFile.readLine()
+i++
+}
+def linesize = i
+def k=0
+def n=3
+while (n<colsize1)
+{
+ def paramWrite = [:]
+ def paramAddNode = [:]
+ k=0
+ while (k<linesize)
+ {
+  // operation WRITE - replaces the value in the node
+  // Below the parameters defining replacement of values are saved in memory
+  if (TACs[k][0]=="write")
+  {paramWrite[TACs[k][1]] = TACs[k][n]
+  // log.info ("Param: "+TACs[k][1] +" TACs: "+TACs[k][n]+" k="+k.toString()+"n="+n.toString());
+  }
+  // operation ADDNODE - Adds a new node
+  // Below the parameters defining creation of new nodes are saved in memory
+  if (TACs[k][0]=="addnode" & TACs[k][n]!="")
+  {paramAddNode[TACs[k][1]] = TACs[k][n] //+"^"+TACs[k][1].toString() // incorporating the number of the child to the value
+  // log.info ("Param: "+TACs[k][2] +" TACs: "+TACs[k][n]+" k="+k.toString()+"n="+n.toString());
+  }
+  k++
+ }
+ 
+// READING TACs completed
+// XML transformation starts
+// WRITE Operation starts
+ ///
+
+def holder = new XmlHolder(new File(myInputFile).getText())
+ paramWrite.each { key,value ->
+holder.setNodeValue(key,value)
+holder.updateProperty()
+ }
+def tmpOutput = holder.getXml()
+
+/*    //  first approach with Slurper
+    def xml = new XmlSlurper().parseText( new File(myInputFile).getText() )
+    paramWrite.each { key,value ->
+    def node = xml
+    key.split("\\.").each {
+    log.info (node.text())
+     if(it=="tarife"){node = node."${it}"[0]  
+     log.info ("if_yes")}
+     if(it!="tarife"){node = node."${it}"
+     log.info ("if_no")}
+    
+    log.info (node.text())
+    }
+    node.replaceBody value
+}
+// Temporary serialize
+///def tmpOutput = XmlUtil.serialize(xml)
+//log.info (tmpOutput)
+*/
+// WRITE completed
+// ADDNODE starts
+
+
+  
+holder = new XmlHolder(tmpOutput)
+//def tmpXpath = '//*:Body/*:TestNode/vertragsdaten/vertraege/TestNode'
+
+paramAddNode.each {  key,value ->
+// log.error ("key: "+key+" value: "+value)
+def tmpXpathParent = key.substring(0,key.lastIndexOf("/"))
+//log.error tmpXpathParent
+//def holderNode = holder.getDomNode('//*:Body/*:TestNode/vertragsdaten/vertraege')
+def parentnode  = holder.getDomNode( tmpXpathParent )
+def beforeNode = holder.getDomNode( key ) 
+def ownerDoc= parentnode.getOwnerDocument()
+def fragmentToAdd = value // '''<ermittlung>Input</ermittlung>'''.stripMargin()
+def fragmentToAddHolder  = new XmlHolder( fragmentToAdd )
+// parse top-level node in fragment to add
+def fragmentTargetNode = fragmentToAdd.substring(fragmentToAdd.indexOf('<')+1,fragmentToAdd.indexOf('>'))
+// if there are namespaces
+if (fragmentTargetNode.indexOf(' ')!=-1)
+{fragmentTargetNode = fragmentTargetNode.substring(0,fragmentToAdd.indexOf(' '))}
+fragmentTargetNode = "//"+fragmentTargetNode
+//log.error fragmentTargetNode
+def fragmentToAddNode    = fragmentToAddHolder.getDomNode( fragmentTargetNode )
+def importedFragmentToAddNode = ownerDoc.importNode(fragmentToAddNode, true)
+//def importedFragmentToAddNode = ownerDoc.importNode(fragmentToAddNode, true)
+   //holderNode.appendChild(importedFragmentToAddNode)   
+   parentnode.insertBefore( importedFragmentToAddNode, beforeNode )
+   holder.updateProperty()
+}
+ // log.info "Post Update: " + holder.getPrettyXml()
+
+tmpOutput = holder.getPrettyXml()
+/*
+
+//!!! tmpAddNode.find { it.name()==('soapenv:Body') }.children().find { it.name()==('web:GetWeather') }.children().add( 0, fragmentToAdd   )
+def tmpAddNode = new XmlParser(false, true).parseText( tmpOutput )
+paramAddNode.each {  key,value ->
+// parsing the number of the child defined in source file
+def InsertNum = value.substring(value.indexOf("^")+1).toInteger()
+value = value.substring(0,value.indexOf("^"))
+//log.error (InsertNum.toString())
+fragmentToAdd = new XmlParser( false, true ).parseText(value) 
+def tmpNODE123 = tmpAddNode
+    key.split("\\.").each { outer ->
+ // log.error ("$outer") // Print out the current value of the node
+  tmpNODE123 = tmpNODE123.find { it.name()=="$outer".toString() }.children()  
+   }
+tmpNODE123.add( InsertNum, fragmentToAdd   )
+}
+tmpOutput = XmlUtil.serialize(tmpAddNode)
+*/
+    
+/*
+def nodePrinter = new XmlNodePrinter(new PrintWriter(new FileWriter("C:/PrepareXML_source/test12345.xml")))
+nodePrinter.preserveWhitespace = true
+nodePrinter.print(xml)
+*/
+/*
+def writer = new FileWriter("C:/PrepareXML_source/test12347.xml")
+def printer = new XmlNodePrinter(new PrintWriter(writer))
+printer.preserveWhitespace = true
+printer.print(xml)
+*/
+//println XmlUtil.serialize(xml)
+
+//System.out.println(TestCase.getAbsolutePath());
+// Writing to file
+def myOutFile = "C:/PrepareXML_source/tmp/G2_"+n.toString()+".xml"
+def f = new File(myOutFile)
+f.write(tmpOutput, "UTF-8")
+n++
+}]]></script></con:config></con:testStep><con:properties/></con:testCase><con:properties/></con:testSuite><con:properties/><con:wssContainer/><con:oAuth2ProfileContainer/><con:sensitiveInformation/></con:soapui-project>
