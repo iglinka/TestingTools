@@ -6,10 +6,72 @@ import com.eviware.soapui.support.XmlHolder
 
 // DEFINING inputs
 
+import javax.swing.JFileChooser
+import javax.swing.filechooser.FileNameExtensionFilter
+
+
+
+def groovyUtils = new com.eviware.soapui.support.GroovyUtils(context)
+def projectDir = groovyUtils.projectPath
+
 // reading Base XML
-def myInputFile = "C:/PrepareXML_source/inputXML7.xml" 
+//def myInputFile = "C:/PrepareXML_source/inputXML7.xml" 
+def myInputFile = projectDir + "/inputXML7.xml"
 // reading TACs
-context.sourceFile = new BufferedReader(new FileReader("C:\\PrepareXML_source\\inputCSV27.csv"))
+//context.sourceFile = new BufferedReader(new FileReader("C:\\PrepareXML_source\\inputCSV27.csv"))
+//context.sourceFile = new BufferedReader(new FileReader("C:/PrepareXML_source/inputCSV27.csv"))
+def myInputCSV = projectDir + "/inputCSV27.csv"
+
+// create the file chooser
+JFileChooser chooser = new JFileChooser() 
+// set whatever directory you want where to start looking for your directory
+chooser.setCurrentDirectory(new java.io.File(projectDir))
+chooser.setDialogTitle("Select XML to use as a template")
+// filter to show only directories
+//chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
+FileNameExtensionFilter filter = new FileNameExtensionFilter("XML Files", "xml")
+chooser.setFileFilter(filter)
+// get the user action
+int returnVal = chooser.showOpenDialog()
+// if the user selects a directory
+if(returnVal == JFileChooser.APPROVE_OPTION) {
+   // get the directory and start your logic
+   File selectedDirectory = chooser.getSelectedFile()
+   // sample print directory path
+   log.info('Selected directory: ' + selectedDirectory.getAbsolutePath())
+   myInputFile = selectedDirectory.getAbsolutePath()
+   // sample print all files inside selected directory
+   selectedDirectory.listFiles().each{ file ->
+        log.info(file.getAbsolutePath())
+   }
+}
+
+// create the file chooser
+chooser = new JFileChooser() 
+// set whatever directory you want where to start looking for your directory
+chooser.setCurrentDirectory(new java.io.File(projectDir))
+chooser.setDialogTitle("Select TAKs in CSV format")
+// filter to show only directories
+//chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY)
+filter = new FileNameExtensionFilter("CSV FILES", "csv")
+chooser.setFileFilter(filter)
+// get the user action
+returnVal = chooser.showOpenDialog()
+// if the user selects a directory
+if(returnVal == JFileChooser.APPROVE_OPTION) {
+   // get the directory and start your logic
+    selectedDirectory = chooser.getSelectedFile()
+   // sample print directory path
+   log.info('Selected directory: ' + selectedDirectory.getAbsolutePath())
+   myInputCSV = selectedDirectory.getAbsolutePath()
+   // sample print all files inside selected directory
+   selectedDirectory.listFiles().each{ file ->
+        log.info(file.getAbsolutePath())
+   }
+}
+
+
+context.sourceFile = new BufferedReader(new FileReader(myInputCSV))
 
 // READING TACs starts
 
@@ -160,7 +222,7 @@ printer.print(xml)
 
 //System.out.println(TestCase.getAbsolutePath());
 // Writing to file
-def myOutFile = "C:/PrepareXML_source/tmp/G2_"+n.toString()+".xml"
+def myOutFile = projectDir+"/tmp/G2_"+n.toString()+".xml"
 def f = new File(myOutFile)
 f.write(tmpOutput, "UTF-8")
 n++
